@@ -5,7 +5,12 @@
 Author: Bing Xu
 
 Research essay written as the major part of my Honours in Finance at the University of Melbourne. 
-Final mark was a H1.
+Final mark was a H1. 
+
+Directory is as follows:
+- /src contains the python scripts used. The entrypoint is analysis.py
+- /data contains the data used - this data is not the original data but the data following processing and cleaning
+- /output contains the output from the regressions/statistical analysis.
 
 ## Abstract
 The Big Three index fund managers, BlackRock, Vanguard and State Street Global
