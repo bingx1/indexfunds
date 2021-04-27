@@ -9,7 +9,8 @@ from file_loaders import load_statestreet_price_data
 from file_loaders import load_crsp_data
 from file_loaders import load_fundamental_data
 from file_loaders import load_governance_data
-
+from file_loaders import load_iss_directors_data
+import difflib
 # This module contains functions to increment the base dataframe
 
 def get_columns(engagements: pd.DataFrame) -> dict:
@@ -226,5 +227,46 @@ def add_governance_data(df: pd.DataFrame, fname: str) -> pd.DataFrame:
     merged = pd.merge(left=df,right=gov_to_merge,left_on=['proposal_year','Ticker'],right_on=['year','TICKER'],how='left')
     merged['Proposal'] = merged.Proposal.str.strip()
     merged['iss_for_mgt'] = 1 * (merged.iss_recommendation == merged['Mgt Rec'])
-
     return merged
+
+def merge_iss_director_data_with_votes(directors: pd.DataFrame, path_to_iss_directors_data: str) -> pd.DataFrame:
+    iss_director_data = load_iss_directors_data(path_to_iss_directors_data)
+    # Match director names in Voting data to ISS data
+    matches = []
+    for ind,row in directors.iterrows():
+        # Lookup director and match in iss data
+        ticker = row['Ticker']
+        year = row['year_x']
+        name = row['name']
+        d = iss_director_data.loc[(iss_director_data.ticker == ticker)& (iss_director_data.year == year)].FULLNAME.to_list()
+        match = difflib.get_close_matches(name,d,1)
+        # See if matching failed
+        if len(match) == 0:
+        # Expand the match range
+            d = iss_director_data.loc[(iss_director_data.ticker == ticker) & ((iss_director_data.year <= year+2) | (iss_director_data.year >= year-2) )].FULLNAME.to_list()
+            match = difflib.get_close_matches(name, d, 1)
+        # Check if matching failed again, and add match to the list
+        if len(match) == 0:
+            matches.append('')
+        else:
+            matches.append(match[0])
+    directors['matched_name'] = matches
+    # Convert date to datetime
+    iss_director_data.MeetingDate = pd.to_datetime(iss_director_data.MeetingDate, format='%Y%m%d')
+    # Sort by date before performing merge
+    iss_director_data.sort_values(by='MeetingDate', inplace=True)
+    # Merge on meeting date
+    merged = pd.merge_asof(left=directors, right=iss_director_data, left_on='meeting_date', right_on='MeetingDate',
+                         left_by=['matched_name', 'Ticker'], right_by=['FULLNAME', 'ticker'], direction='nearest')
+    merged['independent'] = 1 * (merged.classification == 'I')
+    merged['incumbent'] = 1 * (merged.classification == 'E')
+    merged['ceo'] = 1 * (merged.Employment_CEO == 'Yes')
+    merged['outside_seats'] = merged.Outside_Public_Boards
+    merged['attendedless75'] = 1 * (merged.Attend_LESS75_PCT == 'Yes')
+    merged['tenure'] = merged.year - merged.DirSince
+    merged['above65'] = 1 * (merged.Age > 65)
+    merged['female'] = 1 * (merged.female == 'Yes')
+    # # Get rid of NaNs
+    merged = merged.drop(merged.loc[merged.company_id.isna()].index.to_list())[:]
+    return merged
+    

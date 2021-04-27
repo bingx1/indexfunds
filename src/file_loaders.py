@@ -1,5 +1,5 @@
 import pandas as pd
-
+import re
 # This module contains functions to read in the .csv files containing the relevant data
 
 def load_votingdata(fname):
@@ -72,3 +72,14 @@ def load_fundamental_data(path_to_main_data, path_to_missing_data):
 def load_governance_data(fname):
     df = pd.read_csv(fname)
     return df
+
+def load_iss_directors_data(fname):
+    director_data = pd.read_csv(fname, encoding='ISO-8859-1')
+        # Remove commas from ISS data
+    director_data.FULLNAME = director_data.FULLNAME.str.replace(',', '')
+    # Remove duplicate white spaces from ISS data
+    director_data.FULLNAME = director_data.FULLNAME.apply(lambda s: re.sub("\s\s+", " ", s))
+    # Keep only the columns we need
+    keep = ['company_id', 'ticker', 'year', 'MeetingDate', 'FULLNAME', 'classification', 'Employment_CEO',
+            'Outside_Public_Boards', 'Attend_LESS75_PCT', 'DirSince', 'Age', 'female']
+    return director_data[keep]

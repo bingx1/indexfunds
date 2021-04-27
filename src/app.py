@@ -13,6 +13,7 @@ PATH_TO_RETURNS_DATA = "../data/crsp_data.csv"
 PATH_TO_FUNDAMENTALS_DATA = "../data/fundamentals_data.csv"
 PATH_TO_EXTRA_FUNDAMENTALS_DATA = "../data/missing_fundamentals_data.csv"
 PATH_TO_GOVERNANCE_DATA = "../data/iss_governance_data.csv"
+PATH_TO_DIRECTORS_DATA = "../data/iss_director_data.csv"
 
 def clean_df(df):
     '''
@@ -106,6 +107,32 @@ def make_dataframe():
     df = data_loaders.add_governance_data(df, PATH_TO_GOVERNANCE_DATA)
     return df
 
+def clean_director_data(directors):
+    # Change proposals 'In the Elect ... as Director' format to 'Elect Director ....'
+    directors.loc[directors.Proposal.str.contains('as Director'), 'Proposal'] = directors.Proposal.apply(
+        lambda x: 'Elect Director ' + ' '.join(x.split(' ')[1:-2]))
+    # Change proposals 'In the Elect ... as a Director' format to 'Elect Director ....'
+    directors.loc[directors.Proposal.str.contains('as a Director'), 'Proposal'] = directors.Proposal.apply(
+        lambda x: 'Elect Director ' + ' '.join(x.split(' ')[1:-3]))
+    # Add names
+    directors['name'] = directors['Proposal'].apply(lambda x: x.split('Elect Director ')[-1])
+    # Make upper case and remove commas from names
+    directors.name = directors.name.str.upper()
+    directors.name = directors.name.str.replace(',', '')
+
+def separate_director_votes(df):
+    '''
+    Most votes are related to the election of directors.
+    This function splits the votes into two parts: votes pertaining to director elections, and others
+    '''
+    directors = df.loc[df.description.str.contains('Elect Director')][:]
+    clean_director_data(directors)
+    directors = data_loaders.merge_iss_director_data_with_votes(directors, PATH_TO_DIRECTORS_DATA)
+    print(directors.head())
+    other_proposals = df.loc[df.description.str.contains('Elect Director') == False][:]
+    return directors, other_proposals
+
 if __name__ == "__main__":
     df = make_dataframe()
-    print(df.head())
+    # print(df.head())
+    directors, others = separate_director_votes(df)
