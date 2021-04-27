@@ -23,3 +23,24 @@ def load_sp500constituents(fname):
     data['thru'] = pd.to_datetime(data['thru'], dayfirst=True)
     data['nan'] = data['thru'].isna()
     return data
+
+def load_holdings(fname):
+    holdings = pd.read_csv(fname)
+    # Get all the dates for which there are holdings data
+    dates = holdings.fDate.drop_duplicates().to_list()
+    # Make a dictionary to store the value of all holdings at each date
+    dic = {i: holdings.loc[holdings.fDate == i, 'VALUE (x$1000)'].sum() for i in dates}
+    # Make a column equal to the whole portfolio value on that date
+    holdings['portfolio_value'] = holdings.apply(lambda row: dic[row['fDate']], axis=1)
+    # Make a portfolio weight column; both are in x1000 units
+    holdings['portfolio_weight'] = holdings['VALUE (x$1000)'] / holdings['portfolio_value']
+    return holdings
+
+def load_sharepricedata(fname):
+    price_data = pd.read_csv(fname)
+    return price_data
+
+def load_statestreet_price_data(fname):
+    ssga_price = pd.read_csv(fname)
+#     returns state street stock price data
+    return ssga_price

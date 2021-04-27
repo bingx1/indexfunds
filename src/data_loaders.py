@@ -2,7 +2,9 @@ from typing import List
 import pandas as pd
 import datetime
 from file_loaders import load_sp500constituents
-
+from file_loaders import load_holdings
+from file_loaders import load_sharepricedata
+from file_loaders import load_statestreet_price_data
 # This module contains functions to increment the base dataframe
 
 def get_columns(engagements: pd.DataFrame) -> dict:
@@ -95,16 +97,58 @@ def add_timespent_data(df: pd.DataFrame, fname: str) -> pd.DataFrame:
     df['time_insp500'] = times
     return df
 
-def add_holdings_data(df: pd.DataFrame) -> pd.DataFrame: 
+def add_holdings_data(df: pd.DataFrame, fpath: str) -> pd.DataFrame: 
     '''
     Adds the number of shares, type of shares, and market value of the shares owned by State Street of the constituent
     firm at the closest quarter to the meeting date
     '''
     tol = pd.Timedelta('120 days')
-    hh = get_holdings()
-    hh.rDate = pd.to_datetime(hh.rDate)
-    hh = hh[['TITLE OF CLASS', 'CUSIP', 'VALUE (x$1000)', 'SHRS OR PRN AMT', 'SOLE', 'SHARED', 'NONE', 'rDate', 'portfolio_weight']]
-    combined = pd.merge_asof(left=df, right=hh, left_on='Meeting Date', right_on='rDate', left_by='Security ID', right_by='CUSIP',
+    holdings_data = load_holdings(fpath)
+    holdings_data.rDate = pd.to_datetime(holdings_data.rDate)
+    holdings_data = holdings_data[['TITLE OF CLASS', 'CUSIP', 'VALUE (x$1000)', 'SHRS OR PRN AMT', 'SOLE', 'SHARED', 'NONE', 'rDate', 'portfolio_weight']]
+    combined = pd.merge_asof(left=df, right=holdings_data, left_on='Meeting Date', right_on='rDate', left_by='Security ID', right_by='CUSIP',
                   tolerance=tol, direction='nearest')
 
     return combined
+
+def add_price_data(df: pd.DataFrame, fpath: str) -> pd.DataFrame:
+    '''
+    Adds a column containing the market capitalisation of the target firm on the meeting date.
+    '''
+    p = load_sharepricedata(fpath)
+    pp = p[['date', 'TICKER', 'MKT_CAP']][:]
+    pp.date = pd.to_datetime(pp.date, dayfirst=True)
+    pp.sort_values(by='date', inplace=True)
+    combined = pd.merge_asof(left=df, right=pp, left_on='Meeting Date', right_on='date', left_by='Ticker',
+                             right_by='TICKER',
+                             tolerance=pd.Timedelta('50 days'), direction='backward')
+    return combined
+
+
+def add_ssga_price_data(df: pd.DataFrame, fpath: str) -> pd.DataFrame:
+    '''
+    Adds a column containing the market capitalisation of State Street on the meeting date.
+    '''
+    p = load_statestreet_price_data(fpath)
+    p = p[['date', 'market_cap']][:]
+    p.date = pd.to_datetime(p.date, dayfirst=True)
+    c2 = pd.merge_asof(left=df, right=p, left_on='Meeting Date', right_on='date',
+                       tolerance=pd.Timedelta('3 days'), direction='backward')
+    return c2
+
+def add_followed_management(df: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Adds a indicator column equal to 1 if State Street followed management else 0. 
+    '''
+    df['followed_management'] = df.apply(followed_mgt, axis=1)
+    return df
+
+def followed_mgt(row):
+    # When the vote cast for State Street and Management are equal; return 1
+    if row['State Street'] == row['Mgt Rec']:
+        return 1
+    # If its a proxy contest and they did not follow the dissidents recommendation; then count as 1 because they followed management by disagreeing
+    elif (row['Diss Rec'] == 'For') and (row['State Street'] != 'For'):
+        return 1
+    else:
+        return 0
