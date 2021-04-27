@@ -1,5 +1,10 @@
 import pandas as pd
+import datetime
 import loaders
+
+PATH_TO_VOTE_DATA = "../data/votes.csv"
+PATH_TO_ENGAGEMENT_DATA = "../data/stewardship/engagements.csv"
+PATH_TO_SPCONSTITUENT_DATA = "../data/sp500historical_constituents.csv"
 
 def get_columns(engagements):
     '''
@@ -45,6 +50,10 @@ def add_engagements(row, enagements_dict, lag):
         return 0
 
 def add_engagement_data(votes, engagements):
+    '''
+    This function adds 3 columns to the votes data - 'engaged_0year', 'engaged_1year' and 'engaged_2year'.
+    These columns indicate whether State Street Global Advisors engaged the firm within the said time period.
+    '''
     engagements_dict = {}
     engagement_columns = get_columns(engagements)
     tickers = get_tickers(engagements)
@@ -64,7 +73,7 @@ def add_timespent_data(df):
     '''
     Adds the length of time the constituent firm has been in the S&P 500 Index at the time of meeting date
     '''
-    dates = loaders.load_sp500constituents("data/sp500historical_constituents.csv")
+    dates = loaders.load_sp500constituents(PATH_TO_SPCONSTITUENT_DATA)
     first_date = datetime.date(1993, 1, 22)
     times = []
     for ind, row in df.iterrows():
@@ -87,9 +96,13 @@ def add_timespent_data(df):
     df['time_insp500'] = times
     return df
     
-def gen_final_df():
-    votes = load_votingdata("data/votes.csv")
-    engagements = load_engagements("data/stewardship/engagements.csv")
+def make_dataframe():
+    '''
+    Entrypoint to the application.
+    Builds a dataframe with data from all relevant sources and joins into 1. 
+    '''
+    votes = loaders.load_votingdata(PATH_TO_VOTE_DATA)
+    engagements = loaders.load_engagements(PATH_TO_ENGAGEMENT_DATA)
     votes = add_engagement_data(votes, engagements)
     votes = clean_df(votes)
     # Add time spent in S&P 500 column
@@ -105,4 +118,5 @@ def gen_final_df():
     df['followed_ISS'] = df.apply(checker, axis=1)
     return df
 
-
+if __name__ == "__main__":
+    df = make_dataframe()
