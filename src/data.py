@@ -112,7 +112,11 @@ def drop_bad_cols(df: pd.DataFrame):
     # Drop ones where vote outcome is not applicable (i.e. duplicate proposals)
     return df.loc[df.vote_outcome != 'Not Applicable']
 
-
+def clean_na(df):
+    df = df.loc[(df.BlackRock.isna() | df.Vanguard.isna()) == False]
+    df = df.loc[df['State Street'].isna() == False]
+    return df
+    
 def make_dataframe():
     '''
     Entrypoint to the application.
