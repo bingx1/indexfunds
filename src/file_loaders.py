@@ -44,3 +44,27 @@ def load_statestreet_price_data(fname):
     ssga_price = pd.read_csv(fname)
 #     returns state street stock price data
     return ssga_price
+
+def load_crsp_data(fname):
+    crsp = pd.read_csv(fname)
+    crsp.date = pd.to_datetime(crsp.date, dayfirst=True)
+    return crsp
+
+def load_fundamental_data(path_to_main_data, path_to_missing_data):
+    f = pd.read_csv(path_to_main_data)
+    f_miss = pd.read_csv(path_to_missing_data)
+    # Make a list of all the companies already in the 'f' dataset
+    already_in = f.tic.drop_duplicates().to_list()
+    # Keep the last row for all duplicates
+    f = f.drop_duplicates(subset=['tic', 'fyear'], keep='last')
+    # Make columns in both datasets match; i.e. make them both uppercase
+    f.columns = f.columns.str.upper()
+    f_miss.columns = f_miss.columns.str.upper()
+    # Get the relevant columns from the missing dataset
+    columns = f.columns.to_list()
+    f_miss = f_miss[columns][:]
+    # Only take the data from the missing dataset that isn't already in the main data
+    f_miss = f_miss.loc[f_miss.TIC.isin(already_in) == False][:]
+    # Join the two dataframes together
+    df = pd.concat([f, f_miss])
+    return df

@@ -1,6 +1,7 @@
 import pandas as pd
 import file_loaders
 import data_loaders
+import datetime
 
 PATH_TO_VOTE_DATA = "../data/votes.csv"
 PATH_TO_ENGAGEMENT_DATA = "../data/stewardship/engagements.csv"
@@ -8,6 +9,10 @@ PATH_TO_SPCONSTITUENT_DATA = "../data/sp500historical_constituents.csv"
 PATH_TO_HOLDINGS_DATA = "../data/ss13fholdings.csv"
 PATH_TO_PRICE_DATA = "../data/sp500constituent_returns.csv"
 PATH_TO_STATESTREET_PRICE_DATA = "../data/ss_price_data.csv"
+PATH_TO_RETURNS_DATA = "../data/crsp_data.csv"
+PATH_TO_FUNDAMENTALS_DATA = "../data/fundamentals_data.csv"
+PATH_TO_EXTRA_FUNDAMENTALS_DATA = "../data/missing_fundamentals_data.csv"
+
 
 def clean_df(df):
     '''
@@ -54,6 +59,30 @@ def add_followed_ISS(df: pd.DataFrame):
 def followed_ISS(row):
     return 1 if row['State Street'] == row['iss_recommendation'] else 0
 
+def tidyup_df(df: pd.DataFrame):
+    '''
+    Removes duplicate columns from dataframe and useless columns, make the column descriptions more accurate
+    Divide the market cap columns by 1000 to stay consistent with the VALUE column
+    '''
+    df = df.drop(labels=['SHRS OR PRN AMT','TITLE OF CLASS', 'CUSIP', 'SOLE', 'SHARED', 'NONE', 'rDate', 'date_x', 'TICKER', 'date_y'], axis=1)
+    df['MKT_CAP'] = df['MKT_CAP']/1000
+    df['market_cap'] = df['market_cap']/1000
+    df = df.rename({'MKT_CAP': 'firm_marketcap(x1000)', 'market_cap': 'STT_marketcap(x1000)', 'VALUE (x$1000)': 'mktvalue_holdings(x1000)',
+               'Meeting Type (from BlackRock data)': 'meeting_type', 'Record Date (from BlackRock Data)': 'record_date',
+               'Security ID': 'CUSIP', 'Meeting Date': 'meeting_date'}, axis=1)
+    df['ownership_stake'] = df['mktvalue_holdings(x1000)'] / df['firm_marketcap(x1000)']
+    df.loc[df['Mgt Rec'].isna(), 'Mgt Rec'] = 'Withhold'
+    return df
+
+def restrict_df_by_date(df: pd.DataFrame, date: pd.Timestamp) -> pd.DataFrame:
+    '''
+    Removes all datapoints/votes before the specified date.
+    '''
+    return df.loc[df['meeting_date'] > date][:]
+
+def make_year_column(df: pd.DataFrame):
+    df['year'] = df.meeting_date.dt.year
+
 def make_dataframe():
     '''
     Entrypoint to the application.
@@ -69,6 +98,11 @@ def make_dataframe():
     df = data_loaders.add_ssga_price_data(df, PATH_TO_STATESTREET_PRICE_DATA)
     add_followed_management(df)
     add_followed_ISS(df)
+    df = tidyup_df(df)
+    df = restrict_df_by_date(df, pd.Timestamp(datetime.date(2014, 1, 1)))
+    df = data_loaders.add_annual_return_data(df, PATH_TO_RETURNS_DATA)
+    make_year_column(df)
+    df = data_loaders.add_fundamental_data(df, PATH_TO_FUNDAMENTALS_DATA, PATH_TO_EXTRA_FUNDAMENTALS_DATA)
     return df
 
 if __name__ == "__main__":

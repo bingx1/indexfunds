@@ -1,3 +1,4 @@
+from json import load
 from typing import List
 import pandas as pd
 import datetime
@@ -5,6 +6,8 @@ from file_loaders import load_sp500constituents
 from file_loaders import load_holdings
 from file_loaders import load_sharepricedata
 from file_loaders import load_statestreet_price_data
+from file_loaders import load_crsp_data
+from file_loaders import load_fundamental_data
 # This module contains functions to increment the base dataframe
 
 def get_columns(engagements: pd.DataFrame) -> dict:
@@ -136,19 +139,70 @@ def add_ssga_price_data(df: pd.DataFrame, fpath: str) -> pd.DataFrame:
                        tolerance=pd.Timedelta('3 days'), direction='backward')
     return c2
 
-def add_followed_management(df: pd.DataFrame) -> pd.DataFrame:
-    '''
-    Adds a indicator column equal to 1 if State Street followed management else 0. 
-    '''
-    df['followed_management'] = df.apply(followed_mgt, axis=1)
+def add_annual_return_data(df: pd.DataFrame, fpath: str):
+    # Set up dictionary to not do the same ones twice:
+    crsp = load_crsp_data(fpath)
+    # Dictionary for firm returns
+    dict = {i:{} for i in df.Ticker.drop_duplicates()}
+    # Dictionary for sp500 returns
+    dict2 = {i:{} for i in df.Ticker.drop_duplicates()}
+    returns_col = []
+    spreturns_col = []
+    for ind, row in df.iterrows():
+        ticker = row['Ticker']
+        date = row['meeting_date']
+        # First check if it's already been calculated:
+        if date in dict[ticker]:
+            annual_return = dict[ticker][date]
+            sp_ret = dict2[ticker][date]
+        else:
+        # Index into the CRSP dataframe, grab price data for that stock
+            returns = crsp.loc[crsp.TICKER == ticker]
+        # Find the closest date + closest date 1y ago to the meeting date for where there is stock return data in the CRSP file
+            close_date = nearest(returns['date'], pd.Timestamp(date))
+            far_date = nearest(returns['date'], (pd.Timestamp(date) - pd.Timedelta('365 days')))
+        # Get the returns between these two dates and add 1 to them
+            rets = returns.loc[(returns.date > far_date) & (returns.date <= close_date)].vwretd + 1
+            sprets = returns.loc[(returns.date > far_date) & (returns.date <= close_date)].sprtrn + 1
+        # Take the cumproduct to convert 12 monthly returns to an annual return, take the last value in the cumprod
+            sp_ret = sprets.cumprod().values[-1]
+            annual_return = rets.cumprod().values[-1]
+        # Since these values weren't in the dictionary, add them to the storage dictionaries
+            dict[ticker][date] = annual_return
+            dict2[ticker][date] = sp_ret
+#         Add the annual return to the firm-returns list
+        returns_col.append(annual_return)
+    #     Add the S&P return to the sp500-returns list
+        spreturns_col.append(sp_ret)
+    #     Use the returns list to make 1y return columns
+    df['1y_return'] = returns_col
+    df['1y_return'] = df['1y_return'] - 1
+    df['1y_spreturn'] = spreturns_col
+    df['1y_spreturn'] = df['1y_spreturn'] - 1
+    # Get excess return as the difference between firm 1 y return and sp 500 1 y return
+    df['excess_return'] = df['1y_return'] - df['1y_spreturn']
     return df
 
-def followed_mgt(row):
-    # When the vote cast for State Street and Management are equal; return 1
-    if row['State Street'] == row['Mgt Rec']:
-        return 1
-    # If its a proxy contest and they did not follow the dissidents recommendation; then count as 1 because they followed management by disagreeing
-    elif (row['Diss Rec'] == 'For') and (row['State Street'] != 'For'):
-        return 1
-    else:
-        return 0
+def nearest(items, pivot):
+    return min(items, key=lambda x: abs(x - pivot))
+
+def add_fundamental_data(df: pd.DataFrame, path_to_main_compustat_data: str, path_to_missing_compustat_data: str) -> pd.DataFrame:
+    '''
+    Adds the target firms fundamental data (as of the meeting date) to the dataframe.
+    '''
+        # Columns we need to use to calculate the things we need
+    columns = ['NI', 'AT', 'LT', 'TXDITC', 'PSTK', 'FYEAR', 'TIC']
+    fundamentals = load_fundamental_data(path_to_main_compustat_data, path_to_missing_compustat_data)
+    # Only keep the columns we need
+    fundamentals = fundamentals[columns]
+    # Replace all NaN values with 0
+    fundamentals[columns] = fundamentals[columns].fillna(0)
+    # Merge with the dataframe on year and Ticker
+    mgd = pd.merge(left=df, right=fundamentals, left_on=['year', 'Ticker'], right_on=['FYEAR', 'TIC'], how='left')
+    # mgd[columns] = mgd[columns].fillna(0)
+    # Make the columns we need; Return on Assets, Book value of Equity, Market leverage, Book/Market  ratio
+    mgd['ROA'] = mgd.NI / mgd.AT
+    mgd['book_equity'] = mgd.AT - mgd.LT + mgd.TXDITC - mgd.PSTK
+    mgd['market_leverage'] = mgd.LT / (mgd['firm_marketcap(x1000)'] / 1000)
+    mgd['bm_equityratio'] = mgd.book_equity / (mgd['firm_marketcap(x1000)'] / 1000)
+    return mgd

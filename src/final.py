@@ -989,13 +989,14 @@ def get_df():
     final_votes2 = final_votes2.drop(final_votes2.loc[final_votes2.Ticker == 'BXLT'].index.to_list())
     # Drop ones where vote outcome is not applicable (i.e. duplicate proposals)
     final_votes2 = final_votes2.loc[final_votes2.vote_outcome != 'Not Applicable']
+    # SET mGT REC ON PROXY CONTESTS TO WITHHOLD
+    final_votes2.loc[final_votes2['Mgt Rec'].isna(), 'Mgt Rec'] = 'Withhold'
     return final_votes2
 
 
 if __name__ == "__main__":
     final_votes2 = get_df()
-    # SET mGT REC ON PROXY CONTESTS TO WITHHOLD
-    final_votes2.loc[final_votes2['Mgt Rec'].isna(), 'Mgt Rec'] = 'Withhold'
+
     # Get directors and others
     directors = final_votes2.loc[final_votes2.description.str.contains('Elect Director')][:]
     other_proposals = final_votes2.loc[final_votes2.description.str.contains('Elect Director') == False][:]
