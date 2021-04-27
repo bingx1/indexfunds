@@ -12,7 +12,7 @@ PATH_TO_STATESTREET_PRICE_DATA = "../data/ss_price_data.csv"
 PATH_TO_RETURNS_DATA = "../data/crsp_data.csv"
 PATH_TO_FUNDAMENTALS_DATA = "../data/fundamentals_data.csv"
 PATH_TO_EXTRA_FUNDAMENTALS_DATA = "../data/missing_fundamentals_data.csv"
-
+PATH_TO_GOVERNANCE_DATA = "../data/iss_governance_data.csv"
 
 def clean_df(df):
     '''
@@ -49,14 +49,14 @@ def followed_mgt(row):
     else:
         return 0
 
-def add_followed_ISS(df: pd.DataFrame):
+def add_followed_iss(df: pd.DataFrame):
     '''
     Adds a indicator column equal to 1 if State Street followed ISS else 0. 
     '''
-    df['followed_ISS'] = df.apply(followed_ISS, axis=1)
+    df['followed_ISS'] = df.apply(followed_iss, axis=1)
     
 
-def followed_ISS(row):
+def followed_iss(row):
     return 1 if row['State Street'] == row['iss_recommendation'] else 0
 
 def tidyup_df(df: pd.DataFrame):
@@ -97,12 +97,13 @@ def make_dataframe():
     df = data_loaders.add_price_data(df, PATH_TO_PRICE_DATA)
     df = data_loaders.add_ssga_price_data(df, PATH_TO_STATESTREET_PRICE_DATA)
     add_followed_management(df)
-    add_followed_ISS(df)
+    add_followed_iss(df)
     df = tidyup_df(df)
     df = restrict_df_by_date(df, pd.Timestamp(datetime.date(2014, 1, 1)))
     df = data_loaders.add_annual_return_data(df, PATH_TO_RETURNS_DATA)
     make_year_column(df)
     df = data_loaders.add_fundamental_data(df, PATH_TO_FUNDAMENTALS_DATA, PATH_TO_EXTRA_FUNDAMENTALS_DATA)
+    df = data_loaders.add_governance_data(df, PATH_TO_GOVERNANCE_DATA)
     return df
 
 if __name__ == "__main__":

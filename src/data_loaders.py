@@ -2,12 +2,14 @@ from json import load
 from typing import List
 import pandas as pd
 import datetime
-from file_loaders import load_sp500constituents
+from file_loaders import load_governance_data, load_sp500constituents
 from file_loaders import load_holdings
 from file_loaders import load_sharepricedata
 from file_loaders import load_statestreet_price_data
 from file_loaders import load_crsp_data
 from file_loaders import load_fundamental_data
+from file_loaders import load_governance_data
+
 # This module contains functions to increment the base dataframe
 
 def get_columns(engagements: pd.DataFrame) -> dict:
@@ -206,3 +208,23 @@ def add_fundamental_data(df: pd.DataFrame, path_to_main_compustat_data: str, pat
     mgd['market_leverage'] = mgd.LT / (mgd['firm_marketcap(x1000)'] / 1000)
     mgd['bm_equityratio'] = mgd.book_equity / (mgd['firm_marketcap(x1000)'] / 1000)
     return mgd
+
+def add_governance_data(df: pd.DataFrame, fname: str) -> pd.DataFrame:
+    '''
+    Adds firm-specific governance data to the dataframe. 
+    This is related to the characteristics of the firms' charter
+    '''
+    df['proposal_year'] = df.meeting_date.dt.year
+    df['year'] = df.meeting_date.dt.year
+    gov = load_governance_data(fname)
+    gov['majority_vote'] = 1 * (gov['MAJOR_VOTE_COMM'].str.contains('majority vote standard'))
+    gov_to_merge = gov[
+        ['CBOARD', 'year', 'TICKER', 'DUALCLASS', 'FAIRPRICE', 'GPARACHUTE', 'LSPMT', 'PPILL', 'UNEQVOTE',
+         'majority_vote']]
+    gov_to_merge = gov_to_merge.fillna(0)
+    gov_to_merge = gov_to_merge.replace(to_replace='YES', value=1)
+    merged = pd.merge(left=df,right=gov_to_merge,left_on=['proposal_year','Ticker'],right_on=['year','TICKER'],how='left')
+    merged['Proposal'] = merged.Proposal.str.strip()
+    merged['iss_for_mgt'] = 1 * (merged.iss_recommendation == merged['Mgt Rec'])
+
+    return merged

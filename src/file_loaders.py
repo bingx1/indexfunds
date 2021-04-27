@@ -68,3 +68,7 @@ def load_fundamental_data(path_to_main_data, path_to_missing_data):
     # Join the two dataframes together
     df = pd.concat([f, f_miss])
     return df
+
+def load_governance_data(fname):
+    df = pd.read_csv(fname)
+    return df
