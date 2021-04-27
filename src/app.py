@@ -1,13 +1,5 @@
 import pandas as pd
-
-def load_votingdata(fname):
-    votes = pd.read_csv(fname)
-    votes['Meeting Date'] = pd.to_datetime(votes['Meeting Date'], dayfirst=True)
-    return votes
-
-def load_engagements(fname):
-    engagements = pd.read_csv(fname)
-    return engagements
+import loaders
 
 def get_columns(engagements):
     '''
@@ -72,7 +64,7 @@ def add_timespent_data(df):
     '''
     Adds the length of time the constituent firm has been in the S&P 500 Index at the time of meeting date
     '''
-    dates = get_sp500constituents()
+    dates = loaders.load_sp500constituents("data/sp500historical_constituents.csv")
     first_date = datetime.date(1993, 1, 22)
     times = []
     for ind, row in df.iterrows():
