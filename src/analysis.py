@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from statsmodels import api as sm
 import statsmodels
+import datetime
 from data import separate_director_votes, make_dataframe
 
 DIRECTOR_INDEPENDENT_VARS = ['engaged_0year', 'Multiple Engagements',
@@ -14,6 +15,55 @@ OTHER_PROPOSAL_INDEPENDENT_VARS = ['engaged_0year', 'Multiple Engagements',
          'portfolio_weight', 'ownership_stake',
          'excess_return',
          'CBOARD', 'DUALCLASS','FAIRPRICE', 'GPARACHUTE', 'LSPMT', 'PPILL', 'UNEQVOTE', 'majority_vote', 'Shareholder']
+
+
+def generate_yearly_stats(df):
+    '''
+    Generates State Street's annual statistics for private engagement.
+    Reporting period = July 1st to 30th June 
+    '''
+    for year in range(2014, 2019):
+        sample = df.loc[(df['Meeting Date'] >= datetime.date(year - 1, 7, 1)) & (
+                df['Meeting Date'] <= datetime.date(year, 6, 30))]
+        engaged = sample.loc[(sample['Engaged in the current year'] == 1)]
+        engagements = len(engaged.drop_duplicates(subset=['Ticker', 'Meeting Date']))
+        followed = sample['followed_ISS'].sum()
+        iss = engaged['followed_ISS']
+        deviated = sample.loc[sample['Engaged in the current year'] == 0, 'followed_ISS']
+        print('{} engagements in {}'.format(engagements, year))
+        print('{}% - {} of {} proposals in {} voted with ISS recommendation'.format(round(100 * followed / len(sample), 4),
+                                                                                    followed, len(sample), year))
+        print('For companies engaged with - Percentage voted with ISS recommendation: {}%'.format(
+            round(100 * iss.sum() / len(iss), 4)))
+        print('For companies not engaged with - Percentage voted with ISS recommendation: {}%'.format(round(
+            100 * deviated.sum() / len(deviated), 4)))
+    return
+
+
+def dynamics_analysis(df):
+    '''
+    Analyse which proposals the big three index funds disagreed on. 
+    Returns a dictionary containing the topic and the number of times the funds' disagreed on said topic.
+    '''
+    # first clean it up by only keeping
+    df = df.loc[(df.Vanguard.isna() == False) & (df['State Street'].isna() == False) & (df.BlackRock.isna() == False)]
+    agreed = df.loc[((df['State Street'] == df['BlackRock']) & (df['Vanguard'] == df['State Street']))]
+    disagreed = df.loc[((df['State Street'] == df['BlackRock']) & (df['Vanguard'] == df['State Street'])) == False, 'Proposal']
+    disagreed_on = df.loc[((df['State Street'] == df['BlackRock']) & (
+                df['Vanguard'] == df['State Street'])) == False, 'Proposal'].to_list()
+    director_elections = ['Elect Director' in i for i in disagreed_on]
+    de_disagreed = sum(director_elections)
+    remove = []
+    leftover = disagreed[disagreed.str.contains('Elect Director') == False]
+    dic = {}
+    for words in ['Pay Frequency','Management Nominee','as Director','A Director','Declassify','Named Executive',
+                  'Political', 'Independent Board','Lobbying','Emissions', 'Adjourn Meeting']:
+        x = leftover[leftover.str.contains(words)].index.to_list()
+        remove += x
+        dic[words] = len(x)
+    dic['director'] = de_disagreed + dic['as Director'] + dic['A Director'] + dic['Management Nominee']
+    return dic
+
 
 def get_topshareholderproposals(df):
     df['desc'] = df.description
