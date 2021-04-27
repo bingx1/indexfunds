@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from statsmodels import api as sm
 import statsmodels
+from data import separate_director_votes, make_dataframe
 
 def get_topshareholderproposals(df):
     df['desc'] = df.description
@@ -75,5 +76,44 @@ def regress(df, dep, indep, constant = True):
     # margeffs = out.get_margeff(at='median', method='dydx')
     # margeffs.summary()
     # margeffs2 = out.get_margeff(at='mean', method='dydx')
-
     return out
+
+def analyse_votes_by_fund(df: pd.DataFrame):
+        # Percentage of votes cast with management/ISS per year for each firm
+    res ={}
+    for year in range(2014, 2019):
+        res[year] = {}
+        for fund in ['State Street', 'BlackRock', 'Vanguard','iss_recommendation']:
+            if fund == 'BlackRock' and year == 2017:
+                dat = df.loc[
+                    (df.year_x == year) & (df.Proposal.str.contains('Pay Frequency') == False)]
+            else:
+                dat = df.loc[df.year_x == year]
+            total = len(dat)
+            res[year][fund] = round((dat[fund] == dat['Mgt Rec']).sum() / total, 4)
+    res = pd.DataFrame(res)
+
+    res0 = {}
+    for fund in ['State Street', 'BlackRock', 'Vanguard']:
+        res0[fund] = {}
+        consensus = df.loc[(df.Sponsor == 'Shareholder') &(df.iss_for_mgt == 1) & ( (df.year_x == 2017) & (df.Proposal.str.contains('Pay Frequency') == False))]
+        contentious = df.loc[(df.Sponsor == 'Shareholder')& (df.iss_for_mgt == 0) & ( (df.year_x == 2017) & (df.Proposal.str.contains('Pay Frequency') == False))]
+        cons_t = len(consensus)
+        cont_t = len(contentious)
+        res0[fund]['consensus'] = round((consensus[fund] == consensus['iss_recommendation']).sum() / cons_t, 4)
+        res0[fund]['contentious'] = round((contentious[fund] == contentious['iss_recommendation']).sum() / cont_t, 4)
+    return res, res0
+
+def split_contentious_directors(directors: pd.DataFrame):
+    contentious_directors = directors.loc[directors.iss_for_mgt == 0]
+    consensus_directors = directors.loc[directors.iss_for_mgt == 1]
+    return contentious_directors, consensus_directors
+
+def split_contentious_other_proposals(other_proposals: pd.DataFrame):
+    contentious_other = other_proposals.loc[other_proposals.iss_for_mgt == 0]
+    consensus_other = other_proposals.loc[other_proposals.iss_for_mgt == 1]
+    return contentious_other, consensus_other
+
+if __name__ == "__main__":
+    df = make_dataframe()
+    directors, others = separate_director_votes(df)
