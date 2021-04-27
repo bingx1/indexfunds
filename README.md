@@ -4,7 +4,8 @@
 
 Author: Bing Xu
 
-Research essay written as part of my Honours in Finance. Final mark was a H1.
+Research essay written as the major part of my Honours in Finance at the University of Melbourne. 
+Final mark was a H1.
 
 ## Abstract
 The Big Three index fund managers, BlackRock, Vanguard and State Street Global
@@ -22,4 +23,3 @@ private firm-specific information, and I document significant differences betwee
 Street’s voting behaviour at shareholder meetings with and without engagement. State
 Street’s votes appear to be motivated by fundamentals, and there is strong evidence to
 suggest they actively monitor portfolio firms.
-
