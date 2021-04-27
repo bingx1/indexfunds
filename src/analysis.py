@@ -4,6 +4,17 @@ from statsmodels import api as sm
 import statsmodels
 from data import separate_director_votes, make_dataframe
 
+DIRECTOR_INDEPENDENT_VARS = ['engaged_0year', 'Multiple Engagements',
+         'portfolio_weight', 'ownership_stake',
+         'excess_return',
+         'CBOARD', 'DUALCLASS','FAIRPRICE', 'GPARACHUTE', 'LSPMT', 'PPILL', 'UNEQVOTE', 'majority_vote',
+          'independent', 'incumbent', 'ceo', 'outside_seats', 'attendedless75', 'tenure', 'above65', 'female']
+
+OTHER_PROPOSAL_INDEPENDENT_VARS = ['engaged_0year', 'Multiple Engagements',
+         'portfolio_weight', 'ownership_stake',
+         'excess_return',
+         'CBOARD', 'DUALCLASS','FAIRPRICE', 'GPARACHUTE', 'LSPMT', 'PPILL', 'UNEQVOTE', 'majority_vote', 'Shareholder']
+
 def get_topshareholderproposals(df):
     df['desc'] = df.description
     # df.loc[df.Proposal.str.contains('Politic') | df.Proposal.str.contains(
@@ -117,3 +128,30 @@ def split_contentious_other_proposals(other_proposals: pd.DataFrame):
 if __name__ == "__main__":
     df = make_dataframe()
     directors, others = separate_director_votes(df)
+
+    #---------SUMMARY STATS------------
+    # Top shareholder proposals
+    top_shareholder_proposals = get_topshareholderproposals(df)
+    print(top_shareholder_proposals)
+    # Fund voting habits
+    with_management, with_iss = analyse_votes_by_fund(df)
+
+    #---------State Street ENGAGEMENT EFFECT ---------- 
+    # Split into contentious and consensus
+    contentious_directors, consensus_directors = split_contentious_directors(directors)
+    contentious_other, consensus_other = split_contentious_other_proposals(others)
+
+    # Investigate State Street following management recommendations:
+    DEP_VAR = 'followed_management'
+    contentious_directors_management = summary_to_df(regress(contentious_directors, DEP_VAR, DIRECTOR_INDEPENDENT_VARS))
+    consensus_directors_management = summary_to_df(regress(consensus_directors, DEP_VAR, DIRECTOR_INDEPENDENT_VARS))
+    contentious_other_proposals_management = summary_to_df(regress(contentious_other, DEP_VAR, OTHER_PROPOSAL_INDEPENDENT_VARS))
+    consensus_other_proposals_management = summary_to_df(regress(consensus_other, DEP_VAR, OTHER_PROPOSAL_INDEPENDENT_VARS))
+
+    # Investigate State Street following ISS recommendations:
+    DEP_VAR = 'followed_ISS'
+    contentious_directors_iss = summary_to_df(regress(contentious_directors, DEP_VAR, DIRECTOR_INDEPENDENT_VARS))
+    consensus_directors_iss = summary_to_df(regress(consensus_directors, DEP_VAR, DIRECTOR_INDEPENDENT_VARS))
+    contentious_other_proposals_iss = summary_to_df(regress(contentious_other, DEP_VAR, OTHER_PROPOSAL_INDEPENDENT_VARS))
+    consensus_other_proposals_iss = summary_to_df(regress(consensus_other, DEP_VAR, OTHER_PROPOSAL_INDEPENDENT_VARS))
+
