@@ -23,3 +23,9 @@ private firm-specific information, and I document significant differences betwee
 Street’s voting behaviour at shareholder meetings with and without engagement. State
 Street’s votes appear to be motivated by fundamentals, and there is strong evidence to
 suggest they actively monitor portfolio firms.
+
+## Getting started - running this code
+1. Clone this repository
+```bash
+git clone https://github.com/bingx1/indexfunds.git
+```
