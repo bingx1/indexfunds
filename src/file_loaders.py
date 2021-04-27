@@ -1,5 +1,7 @@
 import pandas as pd
 
+# This module contains functions to read in the .csv files containing the relevant data
+
 def load_votingdata(fname):
     votes = pd.read_csv(fname)
     votes['Meeting Date'] = pd.to_datetime(votes['Meeting Date'], dayfirst=True)

@@ -1,10 +1,11 @@
+from typing import List
 import pandas as pd
 import datetime
 from file_loaders import load_sp500constituents
 
+# This module contains functions to increment the base dataframe
 
-
-def get_columns(engagements):
+def get_columns(engagements: pd.DataFrame) -> dict:
     '''
     Returns a dictionary of dictionaries.
     {2012:{'Multiple Engagements': ['AAPL', 'MSFT]}, etc.}
@@ -19,12 +20,12 @@ def get_columns(engagements):
             cols[i][col] = ticks
     return cols
 
-def get_tickers(engagements):
+def get_tickers(engagements: pd.DataFrame) -> list:
     tickers = engagements['Ticker'].unique().tolist()
     return tickers[1:]
 
 
-def add_engagement_details(row, details_dict, col):
+def add_engagement_details(row, details_dict: dict, col: str):
     '''
     To be applied to each row of the dataframe. 
     Adds data relating to the type of engagement conducted by State Street.
@@ -35,7 +36,7 @@ def add_engagement_details(row, details_dict, col):
     return 1 if ticker in details_dict[year][col] else 0 
 
 
-def add_engagements(row, enagements_dict, lag):
+def add_engagements(row, enagements_dict: dict, lag: int):
     '''
     To be applied to each row of the dataframe.
     Checks to see if a firm was engaged by State Street within a given period.
@@ -47,7 +48,7 @@ def add_engagements(row, enagements_dict, lag):
     else:
         return 0
 
-def add_engagement_data(votes, engagements):
+def add_engagement_data(votes: pd.DataFrame, engagements: pd.DataFrame) -> pd.DataFrame:
     '''
     This function adds 3 columns to the votes data - 'engaged_0year', 'engaged_1year' and 'engaged_2year'.
     These columns indicate whether State Street Global Advisors engaged the firm within the said time period.
@@ -67,7 +68,7 @@ def add_engagement_data(votes, engagements):
     votes['engaged_2year'] = votes.apply(add_engagements, args=(engagements_dict, 2), axis=1)
     return votes
 
-def add_timespent_data(df, fname):
+def add_timespent_data(df: pd.DataFrame, fname: str) -> pd.DataFrame:
     '''
     Adds the length of time the constituent firm has been in the S&P 500 Index at the time of meeting date
     '''
@@ -93,3 +94,17 @@ def add_timespent_data(df, fname):
         times.append(time)
     df['time_insp500'] = times
     return df
+
+def add_holdings_data(df: pd.DataFrame) -> pd.DataFrame: 
+    '''
+    Adds the number of shares, type of shares, and market value of the shares owned by State Street of the constituent
+    firm at the closest quarter to the meeting date
+    '''
+    tol = pd.Timedelta('120 days')
+    hh = get_holdings()
+    hh.rDate = pd.to_datetime(hh.rDate)
+    hh = hh[['TITLE OF CLASS', 'CUSIP', 'VALUE (x$1000)', 'SHRS OR PRN AMT', 'SOLE', 'SHARED', 'NONE', 'rDate', 'portfolio_weight']]
+    combined = pd.merge_asof(left=df, right=hh, left_on='Meeting Date', right_on='rDate', left_by='Security ID', right_by='CUSIP',
+                  tolerance=tol, direction='nearest')
+
+    return combined
